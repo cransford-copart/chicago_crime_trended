@@ -1,0 +1,122 @@
+---
+title: "Chicago Crime Trended"
+author: "Carson"
+date: "December 30, 2018"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE, fontsize=10}
+knitr::opts_chunk$set(echo = FALSE)
+library(dplyr); library(data.table); library(plotly); library(lubridate)
+```
+
+## Chicago Crime Volume
+In this exercise we will be using daata that can be obtained from the cityofchicago.org. The link to downloading the data can be found below.
+- "https://data.cityofchicago.org/api/views/vwwp-7yr9/rows.csv?accessType=DOWNLOAD&bom=true&format=true"
+
+We are interested in viewing the trended volume of crime reports based on where the crime was reported. The areas we selected are as follows.
+- Street
+- Residence
+- Retail Store
+- Public School/Building
+
+
+```{r load data, cache=TRUE}
+# Load Crime data from 
+library(dplyr)
+library(data.table)
+crimeDf <- read.csv(url("https://data.cityofchicago.org/api/views/vwwp-7yr9/rows.csv?accessType=DOWNLOAD&bom=true&format=true"))
+crimeDf <- as.data.table(crimeDf)
+```
+
+
+## R Code to Tidy Data
+```{r tidy and summarize data, echo=TRUE, fontsize=10}
+crimeDf$Date <- as.Date(crimeDf$Date, '%m/%d/%Y %H:%M:%S')
+crimeDf$Month <- cut(crimeDf$Date, breaks="month")
+## Summarize reported 911 calls by Location.Description and Date
+# Select only locations of interest/volume
+locationVals <- 
+  setDT(crimeDf)[,
+                 list(
+                   num_reports = length(Case.Number != '')
+                   ),
+                 by = Location.Description]
+
+locationVals <- 
+  locationVals[order(locationVals$num_reports, decreasing=TRUE),]
+
+locationVals <- c('STREET','RESIDENCE','SMALL RETAIL STORE',
+                  'SCHOOL, PUBLIC, BUILDING')
+```
+
+## R Code to Summarize Data
+```{r tidy and summarize data Part 2, echo=TRUE, fontsize=10}
+locationSub <- 
+  crimeDf[Location.Description %in% locationVals,]
+
+locationSumm <- 
+  setDT(locationSub)[,
+                     list(
+                       report_count = length(Case.Number != '')
+                       ),
+                     by=c("Month","Location.Description")]
+
+locationSumm <- locationSumm[(order(locationSumm$Month)),]
+monthFactors <- 
+  c("2015-01-01","2015-02-01","2015-03-01","2015-04-01",
+    "2015-05-01","2015-06-01","2015-07-01","2015-08-01",
+    "2015-09-01","2015-10-01","2015-11-01","2015-12-01")
+
+locationSumm$Month <- 
+  factor(locationSumm$Month, levels=monthFactors)
+```
+
+## Set Plotly Parameters
+```{r Set Plotly Parameters, echo=TRUE}
+f1 <- list(
+  family="Arial, sans-serif",
+  size=18,
+  color="black")
+
+fx1 <- list(
+  family="Arial, sans-serif",
+  titlefont = f1,
+  rangemode="tozero",
+  title = "Month"
+)
+
+fy1 <- list(
+  family="Arial, sans-serif",
+  titlefont = f1,
+  rangemode="tozero",
+  title = "Volume"
+)
+```
+
+## Create Plotly Graph
+```{r Create Plot, echo=TRUE}
+p <- plot_ly(locationSumm, x=~Month, y=~report_count,
+        type="scatter",
+        mode="lines",
+        color=~Location.Description,
+        showlegend=TRUE,
+        line = list(
+          width=4
+        )) %>%
+  layout(legend=list(x=1, y=1, size=20),
+         xaxis=fx1,
+         yaxis=fy1)
+```
+
+## Trended Volume Plot
+```{r, echo=FALSE, message=FALSE, warning=FALSE, comment=FALSE}
+p
+```
+
+## Results
+Highlighted observations from previous graph
+
+- Street & Residence crime reduces during the holiday season
+- Crime in Public Schools reduce drastically during the summer session when kids are outof school
+- Crime in small stores are lowest during prime tax refund time (Feb - April)
